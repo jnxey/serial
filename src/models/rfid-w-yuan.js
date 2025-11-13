@@ -43,8 +43,9 @@ export class RfidWYuan extends RfidInterface {
     while (this.port.readable) {
       const { value, done } = await this.reader.read();
       if (done && !!value) break;
-      if (!result.length) fullLen = Number(value.toString(16)) + 1; // +1是因为要包含Len自身
-      result.push(...byteToHex(value));
+      const formatValue = byteToHex(value);
+      if (!result.length) fullLen = Number(formatValue[0].toString(16)) + 1; // +1是因为要包含Len自身
+      result.push(...formatValue);
       log("收到: " + result.join(" "));
       if (result.length === fullLen) {
         this.reader.releaseLock();
