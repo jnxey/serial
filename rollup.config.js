@@ -5,13 +5,12 @@ import { terser } from "rollup-plugin-terser"; // 压缩JavaScript代码
 
 export default {
   // 入口文件路径
-  input: "src/serial.js",
+  input: "src/rfid-factory.js",
   // 输出配置
   output: [
     {
-      file: "../game-view/src/tools/serial.js", // 输出文件路径
+      file: "../game-view/src/tools/rfid.js", // 输出文件路径
       format: "esm", // ES模块格式，适合现代打包工具
-      name: "Serial",
       sourcemap: false, // 生成sourcemap便于调试
     },
   ],
