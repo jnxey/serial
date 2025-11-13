@@ -15,4 +15,8 @@ export class RfidInterface {
   async disconnect() {
     throw new Error("disconnect() 未实现");
   }
+
+  async scanLabel() {
+    throw new Error("scanLabel() 未实现");
+  }
 }
