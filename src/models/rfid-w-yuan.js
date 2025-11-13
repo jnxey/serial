@@ -109,7 +109,7 @@ export class RfidWYuan extends RfidInterface {
       bit3_0: 8,
     }); // QValue
     const session = 0xff; // 1个字节，询查EPC标签时使用的Session值。
-    const maskMem = 0x02; // 一个字节，掩码区。0x01：EPC存储区；0x02：TID存储区；0x03：用户存储区。其他值保留。
+    const maskMem = 0x01; // 一个字节，掩码区。0x01：EPC存储区；0x02：TID存储区；0x03：用户存储区。其他值保留。
     const maskAdr = [0x00, 0x00]; // 掩码相关
     const maskLen = 0x00; // 掩码相关
     const maskData = []; // 掩码相关
