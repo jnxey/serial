@@ -1,6 +1,16 @@
 import { RfidInterface } from "../rfid-interface";
 import { buildByteValue, byteToHex, CRC16Modbus, log } from "../tools";
 
+const WY_STATUS_MAP = {
+  success: "00", // 操作成功
+  finish: "01", // 命令执行结束，同时返回询查到的电子标签数据
+  overTime: "02", // 询查时间结束，命令执行强制退出，同时返回已询查到的标签数据
+  extend: "03", // 如果读到的标签数量无法在一条消息内传送完，将分多次发送。如果Status为0x03，则表示这条数据结束后，还有数据。
+  overNumber: "04", // 还有电子标签未读取，电子标签数量太多，读写器的存储区已满，返回此状态值，同时返回已询查到得电子标签数据。
+  aerial: "f8", // 天线连接检测错误，当前天线连接可能已经断开。
+  params: "ff", // 参数错误
+};
+
 export class RfidWYuan extends RfidInterface {
   // 实例
   baudRate = 57600;
@@ -26,7 +36,7 @@ export class RfidWYuan extends RfidInterface {
       if (!this.writer) return log("请先连接串口");
       const cmdByte = this.buildCommand(adr, cmd, data);
       await this.writer.write(cmdByte);
-      log("发送: " + byteToHex(cmdByte).join(" "));
+      log(byteToHex(cmdByte), "发送");
       const result = await this.readResponse();
       success(result);
     } catch (e) {
@@ -38,21 +48,34 @@ export class RfidWYuan extends RfidInterface {
   // 读取结果
   async readResponse() {
     // 等待结果返回
+
+    const minLen = 4;
+    const splicing = [];
     const result = [];
     let fullLen = null;
     while (this.port.readable) {
       const { value, done } = await this.reader.read();
       if (done && !!value) break;
+      if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
       const formatValue = byteToHex(value);
-      if (!result.length) fullLen = Number(formatValue[0].toString(16)) + 1; // +1是因为要包含Len自身
       result.push(...formatValue);
-      log("收到: " + result.join(" "));
       if (result.length === fullLen) {
-        log("接收结束");
-        break;
+        if (
+          result[3] === WY_STATUS_MAP.finish ||
+          result[3] === WY_STATUS_MAP.success
+        ) {
+          splicing.push([...result]);
+          result.splice(0);
+          return { code: "success", data: splicing }; // 返回成功获取到的消息
+        } else if (result[3] === WY_STATUS_MAP.extend) {
+          log(result, "Part" + splicing.length);
+          splicing.push([...result]);
+          result.splice(0);
+        } else {
+          return { code: result[3] }; // 返回错误消息
+        }
       }
     }
-    return result;
   }
 
   // 串口关闭连接
@@ -102,7 +125,7 @@ export class RfidWYuan extends RfidInterface {
   // 扫描标签
   scanLabel(success) {
     const qValue = buildByteValue({
-      bit7: 1,
+      bit7: 0,
       bit6: 0,
       bit5: 1,
       bit4: 0,

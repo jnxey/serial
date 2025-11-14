@@ -1,6 +1,6 @@
 // 日志输出
-export function log(msg) {
-  console.log(`---------------${msg}-----------------`);
+export function log(msg, mark) {
+  console.log(msg, `---------------${mark ?? "log"}`);
 }
 
 // byte数据转为16进制
