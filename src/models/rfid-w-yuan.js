@@ -48,7 +48,6 @@ export class RfidWYuan extends RfidInterface {
       result.push(...formatValue);
       log("收到: " + result.join(" "));
       if (result.length === fullLen) {
-        this.reader.releaseLock();
         log("接收结束");
         break;
       }
@@ -107,14 +106,14 @@ export class RfidWYuan extends RfidInterface {
       bit6: 0,
       bit5: 1,
       bit4: 0,
-      bit3_0: 8,
+      bit3_0: 5,
     }); // QValue
     const session = 0xff; // 1个字节，询查EPC标签时使用的Session值。
     const maskMem = 0x01; // 一个字节，掩码区。0x01：EPC存储区；0x02：TID存储区；0x03：用户存储区。其他值保留。
     const maskAdr = [0x00, 0x00]; // 掩码相关
     const maskLen = 0x00; // 掩码相关
     const maskData = []; // 掩码相关
-    const adrTID = 5; // 表示从 TID 存储区的哪个 字（Word） 开始读取
+    const adrTID = 2; // 表示从 TID 存储区的哪个 字（Word） 开始读取
     const lenTID = 4; // 读取4个字
     const target = 0x00; // 询查EPC标签时使用的Target值
     const ant = 0x80; // 本次要进行询查的天线号
