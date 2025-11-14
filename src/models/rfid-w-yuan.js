@@ -48,8 +48,6 @@ export class RfidWYuan extends RfidInterface {
   // 读取结果
   async readResponse() {
     // 等待结果返回
-
-    const minLen = 4;
     const splicing = [];
     const result = [];
     let fullLen = null;
@@ -64,12 +62,15 @@ export class RfidWYuan extends RfidInterface {
           result[3] === WY_STATUS_MAP.finish ||
           result[3] === WY_STATUS_MAP.success
         ) {
-          splicing.push([...result]);
+          splicing.push({ data: [...result] });
           result.splice(0);
           return { code: "success", data: splicing }; // 返回成功获取到的消息
         } else if (result[3] === WY_STATUS_MAP.extend) {
           log(result, "Part" + splicing.length);
-          splicing.push([...result]);
+          splicing.push({
+            data: [...result],
+            label: this.parseResponse(result.slice(6, -2)),
+          });
           result.splice(0);
         } else {
           return { code: result[3] }; // 返回错误消息
@@ -161,6 +162,19 @@ export class RfidWYuan extends RfidInterface {
         if (success) success(result);
       },
     );
+  }
+
+  // 返回参数解析
+  parseResponse(data) {
+    const header = {
+      FastID: (data[0] & 0x80) !== 0,
+      HasPhaseFreq: (data[0] & 0x40) !== 0,
+      N: data[0] & 0x3f,
+    };
+    return {
+      tid: data.slice(1, 1 + header.N).join(""),
+      rssi: Number("0x" + data[1 + header.N]),
+    };
   }
 
   // 获取port
