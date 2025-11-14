@@ -166,6 +166,7 @@ export class RfidWYuan extends RfidInterface {
 
   // 返回参数解析
   parseResponse(data, result = []) {
+    // 目前data结构 Len 1byte + N byte + RSSI 1byte
     const header = {
       FastID: (data[0] & 0x80) !== 0,
       HasPhaseFreq: (data[0] & 0x40) !== 0,
