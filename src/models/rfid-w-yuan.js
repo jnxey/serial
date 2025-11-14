@@ -165,16 +165,19 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 返回参数解析
-  parseResponse(data) {
+  parseResponse(data, result = []) {
     const header = {
       FastID: (data[0] & 0x80) !== 0,
       HasPhaseFreq: (data[0] & 0x40) !== 0,
       N: data[0] & 0x3f,
     };
-    return {
+    result.push({
       tid: data.slice(1, 1 + header.N).join(""),
       rssi: Number("0x" + data[1 + header.N]),
-    };
+    });
+    const next = data.slice(2 + header.N);
+    if (next.length > 0) this.parseResponse(next, result);
+    return result;
   }
 
   // 获取port
