@@ -2,13 +2,16 @@ import { RfidInterface } from "../rfid-interface";
 import { buildByteValue, byteToHex, CRC16Modbus, log } from "../tools";
 
 const WY_STATUS_MAP = {
-  success: "00", // 操作成功
-  finish: "01", // 命令执行结束，同时返回询查到的电子标签数据
-  overTime: "02", // 询查时间结束，命令执行强制退出，同时返回已询查到的标签数据
-  extend: "03", // 如果读到的标签数量无法在一条消息内传送完，将分多次发送。如果Status为0x03，则表示这条数据结束后，还有数据。
-  overNumber: "04", // 还有电子标签未读取，电子标签数量太多，读写器的存储区已满，返回此状态值，同时返回已询查到得电子标签数据。
-  aerial: "f8", // 天线连接检测错误，当前天线连接可能已经断开。
-  params: "ff", // 参数错误
+  success: { code: "00" }, // 操作成功
+  finish: { code: "01" }, // 命令执行结束，同时返回询查到的电子标签数据
+  overTime: { code: "02", msg: "Inquiry timeout" }, // 询查时间结束，命令执行强制退出，同时返回已询查到的标签数据
+  extend: { code: "03" }, // 如果读到的标签数量无法在一条消息内传送完，将分多次发送。如果Status为0x03，则表示这条数据结束后，还有数据。
+  overNumber: { code: "04", msg: "Tag quantity exceeded limit" }, // 还有电子标签未读取，电子标签数量太多，读写器的存储区已满，返回此状态值，同时返回已询查到得电子标签数据。
+  aerial: {
+    code: "f8",
+    msg: "Please check if the antenna is correctly connected to position 1.",
+  }, // 天线连接检测错误，当前天线连接可能已经断开。
+  params: { code: "ff", msg: "Parameter error" }, // 参数错误
 };
 
 export class RfidWYuan extends RfidInterface {
@@ -41,7 +44,7 @@ export class RfidWYuan extends RfidInterface {
       if (success) success(result);
     } catch (e) {
       log(e);
-      if (error) error();
+      if (error) error(e);
     }
   }
 
@@ -51,7 +54,7 @@ export class RfidWYuan extends RfidInterface {
     const splicing = [];
     const result = [];
     let fullLen = null;
-    while (this.port.readable) {
+    while (this.port?.readable) {
       const { value, done } = await this.reader.read();
       if (done || !value) return { code: result[3] };
       if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
@@ -59,13 +62,13 @@ export class RfidWYuan extends RfidInterface {
       result.push(...formatValue);
       if (result.length === fullLen) {
         if (
-          result[3] === WY_STATUS_MAP.finish ||
-          result[3] === WY_STATUS_MAP.success
+          result[3] === WY_STATUS_MAP.finish.code ||
+          result[3] === WY_STATUS_MAP.success.code
         ) {
           splicing.push({ data: [...result] });
           result.splice(0);
           return { code: "success", data: splicing }; // 返回成功获取到的消息
-        } else if (result[3] === WY_STATUS_MAP.extend) {
+        } else if (result[3] === WY_STATUS_MAP.extend.code) {
           log(result, "Part" + splicing.length);
           splicing.push({
             data: [...result],
@@ -73,8 +76,12 @@ export class RfidWYuan extends RfidInterface {
           });
           result.splice(0);
         } else {
-          // this.reader.releaseLock();
-          return { code: result[3] }; // 返回错误消息
+          let msg = result[3];
+          Object.keys(WY_STATUS_MAP).findIndex((n) => {
+            if (result[3] === WY_STATUS_MAP[n]?.code)
+              msg = WY_STATUS_MAP[n]?.msg;
+          });
+          return { code: result[3], msg }; // 返回错误消息
         }
       }
     }
