@@ -38,10 +38,10 @@ export class RfidWYuan extends RfidInterface {
       await this.writer.write(cmdByte);
       log(byteToHex(cmdByte), "发送");
       const result = await this.readResponse();
-      success(result);
+      if (success) success(result);
     } catch (e) {
       log(e);
-      error();
+      if (error) error();
     }
   }
 
@@ -53,7 +53,7 @@ export class RfidWYuan extends RfidInterface {
     let fullLen = null;
     while (this.port.readable) {
       const { value, done } = await this.reader.read();
-      if (done && !!value) break;
+      if (done || !value) return { code: result[3] };
       if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
       const formatValue = byteToHex(value);
       result.push(...formatValue);
@@ -73,6 +73,7 @@ export class RfidWYuan extends RfidInterface {
           });
           result.splice(0);
         } else {
+          // this.reader.releaseLock();
           return { code: result[3] }; // 返回错误消息
         }
       }
@@ -82,6 +83,7 @@ export class RfidWYuan extends RfidInterface {
   // 串口关闭连接
   async disconnect() {
     try {
+      if (!this.port) return;
       console.log("正在关闭串口...");
 
       // 1️⃣ 停止读取
@@ -101,15 +103,12 @@ export class RfidWYuan extends RfidInterface {
       }
 
       // 3️⃣ 确保流已释放
-      if (this.port.readable) {
-        try {
-          await this.port.readable.cancel();
-        } catch {}
+      if (this.port?.readable) {
+        await this.port.readable.cancel();
       }
-      if (this.port.writable) {
-        try {
-          await this.port.writable.abort();
-        } catch {}
+
+      if (this.port?.writable) {
+        await this.port.writable.abort();
       }
 
       // 4️⃣ 最后关闭串口
@@ -124,7 +123,7 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 扫描标签
-  scanLabel(success) {
+  scanLabel(success, error) {
     const qValue = buildByteValue({
       bit7: 0,
       bit6: 0,
@@ -158,9 +157,8 @@ export class RfidWYuan extends RfidInterface {
         ant,
         scanTime,
       ],
-      (result) => {
-        if (success) success(result);
-      },
+      success,
+      error,
     );
   }
 
