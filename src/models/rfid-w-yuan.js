@@ -22,21 +22,27 @@ export class RfidWYuan extends RfidInterface {
   reader = null;
 
   // 连接设备
-  async connect() {
-    const port = await this.getPort();
-    await port.open({ baudRate: this.baudRate });
-    const writer = port.writable.getWriter();
-    const reader = port.readable.getReader();
-    this.port = port;
-    this.writer = writer;
-    this.reader = reader;
-    log("串口已连接");
+  async connect(success, error) {
+    try {
+      const port = await this.getPort();
+      if (!port.opened) await port.open({ baudRate: this.baudRate });
+      const writer = port.writable.getWriter();
+      const reader = port.readable.getReader();
+      this.port = port;
+      this.writer = writer;
+      this.reader = reader;
+      if (success) success();
+      log("串口已连接");
+    } catch (e) {
+      if (error) error(e);
+    }
   }
 
   // 发送命令，举例：地址0x00，命令0x10，Data=[0x01, 0x02]
   async sendCommand(adr, cmd, data = [], success, error) {
     try {
-      if (!this.writer) return log("请先连接串口");
+      if (!this.writer)
+        return success && success({ msg: "Please connect the device first." });
       const cmdByte = this.buildCommand(adr, cmd, data);
       await this.writer.write(cmdByte);
       log(byteToHex(cmdByte), "发送");
@@ -136,7 +142,7 @@ export class RfidWYuan extends RfidInterface {
       bit6: 0,
       bit5: 1,
       bit4: 0,
-      bit3_0: 5,
+      bit3_0: 15,
     }); // QValue
     const session = 0xff; // 1个字节，询查EPC标签时使用的Session值。
     const maskMem = 0x01; // 一个字节，掩码区。0x01：EPC存储区；0x02：TID存储区；0x03：用户存储区。其他值保留。
@@ -147,7 +153,7 @@ export class RfidWYuan extends RfidInterface {
     const lenTID = 4; // 读取4个字
     const target = 0x00; // 询查EPC标签时使用的Target值
     const ant = 0x80; // 本次要进行询查的天线号
-    const scanTime = 10; // 查询时间 10 * 100 ms
+    const scanTime = 15; // 查询时间 10 * 100 ms
     this.sendCommand(
       0x00,
       0x01,
@@ -167,6 +173,23 @@ export class RfidWYuan extends RfidInterface {
       success,
       error,
     );
+  }
+
+  // 格式化数据，去重
+  formatLabel(labels) {
+    if (!labels) return {};
+    const result = {};
+    labels.forEach((data) => {
+      if (!data.label) return;
+      data.label.forEach((label) => {
+        if (!!result[label.tid]) {
+          result[label.tid].count = result[label.tid].count + 1;
+        } else {
+          result[label.tid] = { ...label, count: 1 };
+        }
+      });
+    });
+    return Object.keys(result).map((n) => result[n]);
   }
 
   // 返回参数解析
