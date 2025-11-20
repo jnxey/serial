@@ -25,6 +25,15 @@ export default {
       babelHelpers: "bundled",
       exclude: "node_modules/**", // 排除node_modules
       extensions: [".js", ".jsx", ".ts", ".tsx"], // 支持的文件扩展名
+      presets: [
+        [
+          "@babel/preset-env",
+          {
+            targets: ">0.25%, not dead", // 或指定 IE11: { ie: "11" }
+            modules: false,
+          },
+        ],
+      ],
     }),
     // 生产环境代码压缩
     terser(),
