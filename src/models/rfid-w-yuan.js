@@ -182,6 +182,7 @@ export class RfidWYuan extends RfidInterface {
     labels.forEach((data) => {
       if (!data.label) return;
       data.label.forEach((label) => {
+        if (label.rssi < 60) return;
         if (!!result[label.tid]) {
           result[label.tid].count = result[label.tid].count + 1;
         } else {
