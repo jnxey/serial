@@ -56,40 +56,45 @@ export class RfidWYuan extends RfidInterface {
 
   // 读取结果
   async readResponse() {
-    // 等待结果返回
-    const splicing = [];
-    const result = [];
-    let fullLen = null;
-    while (this.port?.readable) {
-      const { value, done } = await this.reader.read();
-      if (done || !value) return { code: result[3] };
-      if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
-      const formatValue = byteToHex(value);
-      result.push(...formatValue);
-      if (result.length === fullLen) {
-        if (
-          result[3] === WY_STATUS_MAP.finish.code ||
-          result[3] === WY_STATUS_MAP.success.code
-        ) {
-          splicing.push({ data: [...result] });
-          result.splice(0);
-          return { code: "success", data: splicing }; // 返回成功获取到的消息
-        } else if (result[3] === WY_STATUS_MAP.extend.code) {
-          log(result, "Part" + splicing.length);
-          splicing.push({
-            data: [...result],
-            label: this.parseResponse(result.slice(6, -2)),
-          });
-          result.splice(0);
-        } else {
-          let msg = result[3];
-          Object.keys(WY_STATUS_MAP).findIndex((n) => {
-            if (result[3] === WY_STATUS_MAP[n]?.code)
-              msg = WY_STATUS_MAP[n]?.msg;
-          });
-          return { code: result[3], msg }; // 返回错误消息
+    try {
+      // 等待结果返回
+      const splicing = [];
+      const result = [];
+      let fullLen = null;
+      while (this.port?.readable) {
+        const { value, done } = await this.reader.read();
+        if (done || !value) return { code: result[3] };
+        if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
+        const formatValue = byteToHex(value);
+        result.push(...formatValue);
+        if (result.length === fullLen) {
+          if (
+            result[3] === WY_STATUS_MAP.finish.code ||
+            result[3] === WY_STATUS_MAP.success.code
+          ) {
+            splicing.push({ data: [...result] });
+            result.splice(0);
+            return { code: "success", data: splicing }; // 返回成功获取到的消息
+          } else if (result[3] === WY_STATUS_MAP.extend.code) {
+            log(result, "Part" + splicing.length);
+            splicing.push({
+              data: [...result],
+              label: this.parseResponse(result.slice(6, -2)),
+            });
+            result.splice(0);
+          } else {
+            let msg = result[3];
+            Object.keys(WY_STATUS_MAP).findIndex((n) => {
+              if (result[3] === WY_STATUS_MAP[n]?.code)
+                msg = WY_STATUS_MAP[n]?.msg;
+            });
+            return { code: result[3], msg }; // 返回错误消息
+          }
         }
       }
+    } catch (e) {
+      console.log(e, "-----------------------eeee");
+      return { code: "JS", msg: String(e) };
     }
   }
 
