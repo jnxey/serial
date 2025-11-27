@@ -182,7 +182,7 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 格式化数据，去重
-  async formatLabel(labels) {
+  formatLabel(labels) {
     if (!labels) return {};
     const result = {};
     labels.forEach((data) => {
