@@ -141,7 +141,8 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 扫描标签
-  scanLabel(success, error) {
+  scanLabel(success, error, options = {}) {
+    const opts = { ant: 0x80, scanTime: 15, ...options };
     const qValue = buildByteValue({
       bit7: 0,
       bit6: 0,
@@ -157,8 +158,8 @@ export class RfidWYuan extends RfidInterface {
     const adrTID = 2; // 表示从 TID 存储区的哪个 字（Word） 开始读取
     const lenTID = 4; // 读取4个字
     const target = 0x00; // 询查EPC标签时使用的Target值
-    const ant = 0x80; // 本次要进行询查的天线号
-    const scanTime = 15; // 查询时间 10 * 100 ms
+    const ant = opts.ant; // 本次要进行询查的天线号
+    const scanTime = opts.scanTime; // 查询时间 10 * 100 ms
     this.sendCommand(
       0x00,
       0x01,
@@ -181,7 +182,7 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 格式化数据，去重
-  formatLabel(labels) {
+  async formatLabel(labels) {
     if (!labels) return {};
     const result = {};
     labels.forEach((data) => {
