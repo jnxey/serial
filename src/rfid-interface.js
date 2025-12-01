@@ -20,6 +20,10 @@ export class RfidInterface {
     throw new Error("scanLabel() 未实现");
   }
 
+  async scanStop() {
+    throw new Error("scanStop() 未实现");
+  }
+
   async formatLabel() {
     throw new Error("formatLabel() 未实现");
   }

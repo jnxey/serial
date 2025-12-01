@@ -20,6 +20,8 @@ export class RfidWYuan extends RfidInterface {
   port = null;
   writer = null;
   reader = null;
+  scanning = false;
+  splicing = []; // 行进中的
 
   // 连接设备
   async connect(success, error) {
@@ -39,29 +41,29 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 发送命令，举例：地址0x00，命令0x10，Data=[0x01, 0x02]
-  async sendCommand(adr, cmd, data = [], success, error) {
+  async sendCommand(adr, cmd, data = [], process, error) {
     try {
       if (!this.writer)
         return success && success({ msg: "Please connect the device first." });
       const cmdByte = this.buildCommand(adr, cmd, data);
       await this.writer.write(cmdByte);
       log(byteToHex(cmdByte), "发送");
-      const result = await this.readResponse();
-      if (success) success(result);
+      this.scanning = true;
+      await this.readResponse(process, error);
     } catch (e) {
       log(e);
       if (error) error(e);
+      this.scanStop();
     }
   }
 
   // 读取结果
-  async readResponse() {
+  async readResponse(process, error) {
     try {
       // 等待结果返回
-      const splicing = [];
       const result = [];
       let fullLen = null;
-      while (this.port?.readable) {
+      while (this.port?.readable && this.scanning) {
         const { value, done } = await this.reader.read();
         if (done || !value) return { code: result[3] };
         if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
@@ -72,29 +74,36 @@ export class RfidWYuan extends RfidInterface {
             result[3] === WY_STATUS_MAP.finish.code ||
             result[3] === WY_STATUS_MAP.success.code
           ) {
-            splicing.push({ data: [...result] });
+            // 完成
+            this.splicing.push({ data: [...result] });
             result.splice(0);
-            return { code: "success", data: splicing }; // 返回成功获取到的消息
+            process({ code: "success", data: this.splicing, finish: true });
+            if (this.scanning) this.readResponse(process);
           } else if (result[3] === WY_STATUS_MAP.extend.code) {
-            log(result, "Part" + splicing.length);
-            splicing.push({
+            // 拼接
+            log(result, "Part" + this.splicing.length);
+            this.splicing.push({
               data: [...result],
               label: this.parseResponse(result.slice(6, -2)),
             });
             result.splice(0);
+            process({ code: "success", data: this.splicing, finish: false });
           } else {
+            // 错误码
             let msg = result[3];
             Object.keys(WY_STATUS_MAP).findIndex((n) => {
               if (result[3] === WY_STATUS_MAP[n]?.code)
                 msg = WY_STATUS_MAP[n]?.msg;
             });
-            return { code: result[3], msg }; // 返回错误消息
+            error({ code: result[3], msg }); // 返回错误消息
+            this.scanStop();
           }
         }
       }
     } catch (e) {
       console.log(e, "-----------------------eeee");
-      return { code: "JS", msg: String(e) };
+      error({ code: "JS", msg: String(e) });
+      this.scanStop();
     }
   }
 
@@ -141,7 +150,7 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 扫描标签
-  scanLabel(success, error, options = {}) {
+  scanLabel(process, error, options = {}) {
     const opts = { ant: 0x80, scanTime: 15, ...options };
     const qValue = buildByteValue({
       bit7: 0,
@@ -176,9 +185,15 @@ export class RfidWYuan extends RfidInterface {
         ant,
         scanTime,
       ],
-      success,
+      process,
       error,
     );
+  }
+
+  // 结束扫描
+  scanStop() {
+    this.scanning = false;
+    this.splicing.splice(0);
   }
 
   // 格式化数据，去重
