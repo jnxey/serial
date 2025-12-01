@@ -1,5 +1,11 @@
 import { RfidInterface } from "../rfid-interface";
-import { buildByteValue, byteToHex, CRC16Modbus, log } from "../tools";
+import {
+  buildByteValue,
+  byteToHex,
+  CRC16Modbus,
+  delayExec,
+  log,
+} from "../tools";
 
 const WY_STATUS_MAP = {
   success: { code: "00" }, // 操作成功
@@ -41,18 +47,21 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 发送命令，举例：地址0x00，命令0x10，Data=[0x01, 0x02]
-  async sendCommand(adr, cmd, data = [], process, error) {
+  async sendCommand(adr, cmd, data = [], process, error, options) {
     try {
       if (!this.writer)
         return success && success({ msg: "Please connect the device first." });
-      const cmdByte = this.buildCommand(adr, cmd, data);
-      await this.writer.write(cmdByte);
-      log(byteToHex(cmdByte), "发送");
       this.scanning = true;
-      await this.readResponse(process, error);
+      while (this.scanning) {
+        const cmdByte = this.buildCommand(adr, cmd, data);
+        await this.writer.write(cmdByte);
+        log(byteToHex(cmdByte), "发送");
+        await this.readResponse(process, error);
+        await delayExec(100);
+      }
     } catch (e) {
       log(e);
-      if (error) error(e);
+      if (error) error({ code: "JS", msg: String(e) });
       this.scanStop();
     }
   }
@@ -65,7 +74,7 @@ export class RfidWYuan extends RfidInterface {
       let fullLen = null;
       while (this.port?.readable && this.scanning) {
         const { value, done } = await this.reader.read();
-        if (done || !value) return { code: result[3] };
+        if (done || !value) return;
         if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
         const formatValue = byteToHex(value);
         result.push(...formatValue);
@@ -77,8 +86,11 @@ export class RfidWYuan extends RfidInterface {
             // 完成
             this.splicing.push({ data: [...result] });
             result.splice(0);
-            process({ code: "success", data: this.splicing, finish: true });
-            if (this.scanning) this.readResponse(process);
+            return process({
+              code: "success",
+              data: this.splicing,
+              finish: true,
+            });
           } else if (result[3] === WY_STATUS_MAP.extend.code) {
             // 拼接
             log(result, "Part" + this.splicing.length);
@@ -91,19 +103,19 @@ export class RfidWYuan extends RfidInterface {
           } else {
             // 错误码
             let msg = result[3];
+            if (msg === WY_STATUS_MAP.overTime.code) return; //
             Object.keys(WY_STATUS_MAP).findIndex((n) => {
               if (result[3] === WY_STATUS_MAP[n]?.code)
                 msg = WY_STATUS_MAP[n]?.msg;
             });
-            error({ code: result[3], msg }); // 返回错误消息
             this.scanStop();
+            return error({ code: result[3], msg }); // 返回错误消息
           }
         }
       }
     } catch (e) {
-      console.log(e, "-----------------------eeee");
-      error({ code: "JS", msg: String(e) });
       this.scanStop();
+      return error({ code: "JS", msg: String(e) });
     }
   }
 
@@ -151,7 +163,7 @@ export class RfidWYuan extends RfidInterface {
 
   // 扫描标签
   scanLabel(process, error, options = {}) {
-    const opts = { ant: 0x80, scanTime: 15, ...options };
+    const opts = { ant: 0x80, scanTime: 50, ...options };
     const qValue = buildByteValue({
       bit7: 0,
       bit6: 0,
@@ -187,6 +199,7 @@ export class RfidWYuan extends RfidInterface {
       ],
       process,
       error,
+      options,
     );
   }
 
@@ -194,6 +207,7 @@ export class RfidWYuan extends RfidInterface {
   scanStop() {
     this.scanning = false;
     this.splicing.splice(0);
+    console.log(this.splicing, "-------------------------stop");
   }
 
   // 格式化数据，去重

@@ -3,6 +3,16 @@ export function log(msg, mark) {
   console.log(msg, `---------------${mark ?? "log"}`);
 }
 
+/**
+ * 延时执行
+ */
+export function delayExec(time) {
+  let timer = null;
+  return new Promise((resolve) => {
+    timer = setTimeout(() => resolve(), time);
+  });
+}
+
 // byte数据转为16进制
 export function byteToHex(value) {
   return Array.from(value).map((v) => v.toString(16).padStart(2, "0"));
