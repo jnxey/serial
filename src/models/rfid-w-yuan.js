@@ -93,7 +93,7 @@ export class RfidWYuan extends RfidInterface {
             });
           } else if (result[3] === WY_STATUS_MAP.extend.code) {
             // 拼接
-            log(result, "Part" + this.splicing.length);
+            // log(result, "Part" + this.splicing.length);
             this.splicing.push({
               data: [...result],
               label: this.parseResponse(result.slice(6, -2)),
@@ -207,7 +207,7 @@ export class RfidWYuan extends RfidInterface {
   scanStop() {
     this.scanning = false;
     this.splicing.splice(0);
-    console.log(this.splicing, "-------------------------stop");
+    // console.log(this.splicing, "-------------------------stop");
   }
 
   // 格式化数据，去重
