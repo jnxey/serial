@@ -50,7 +50,7 @@ export class RfidWYuan extends RfidInterface {
   async sendCommand(adr, cmd, data = [], process, error, options) {
     try {
       if (!this.writer)
-        return success && success({ msg: "Please connect the device first." });
+        return error && error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
         const cmdByte = this.buildCommand(adr, cmd, data);
