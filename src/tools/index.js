@@ -3,6 +3,23 @@ export function log(msg, mark) {
   console.log(msg, `---------------${mark ?? "log"}`);
 }
 
+// 获取通信参数
+export function getParams(value) {
+  return JSON.stringify(value);
+}
+
+/**
+ *  获取json
+ */
+export function getJSON(value, def) {
+  if (!value) return def;
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return def;
+  }
+}
+
 /**
  * 延时执行
  */

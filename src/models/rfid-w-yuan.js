@@ -4,6 +4,8 @@ import {
   byteToHex,
   CRC16Modbus,
   delayExec,
+  getJSON,
+  getParams,
   log,
 } from "../tools";
 
@@ -23,24 +25,61 @@ const WY_STATUS_MAP = {
 export class RfidWYuan extends RfidInterface {
   // 实例
   baudRate = 57600;
-  port = null;
-  writer = null;
-  reader = null;
   scanning = false;
   splicing = []; // 行进中的
+  wsServer = null;
+  wsListener = null;
 
   // 连接设备
-  async connect(success, error) {
+  async connect(success, error, options = {}) {
     try {
-      const port = await this.getPort();
-      if (!port.opened) await port.open({ baudRate: this.baudRate });
-      const writer = port.writable.getWriter();
-      const reader = port.readable.getReader();
-      this.port = port;
-      this.writer = writer;
-      this.reader = reader;
-      if (success) success();
-      log("串口已连接");
+      // 初始化网络服务
+      this.wsServer = new WebSocket(`ws://${options.ip}`);
+      this.wsServer.onmessage = async (e) => {
+        const info = getJSON(e.data, {});
+        if (info.type === "data") {
+          // 接收数据
+          if (!!this.wsListener) this.wsListener(info.data);
+        } else if (info.type === "ports") {
+          // 拿到已连接的设备，并连接
+          const ports = info.data?.map((val) => ({
+            value: val.path,
+            name: val.path,
+          }));
+          if (!ports.length)
+            return error && error({ msg: "Not Found Devices" });
+          let cKey = ports.findIndex(
+            (val) => val.value === options.cache_device,
+          );
+          if (!!ports[cKey]) {
+            // 连接设备
+            this.wsServer.send(
+              getParams({
+                action: "open",
+                path: ports[cKey].value,
+                baudRate: this.baudRate,
+              }),
+            );
+          } else if (!!options.select_port) {
+            const sPort = await options.select_port(ports);
+            this.wsServer.send(
+              getParams({
+                action: "open",
+                path: sPort,
+                baudRate: this.baudRate,
+              }),
+            );
+          }
+        } else if (info.type === "open-success") {
+          // 已打开串口
+          if (success) success();
+        }
+      };
+
+      // 先获取设备
+      this.wsServer.onopen = () => {
+        this.wsServer.send(getParams({ action: "ports" }));
+      };
     } catch (e) {
       if (error) error(e);
     }
@@ -49,12 +88,14 @@ export class RfidWYuan extends RfidInterface {
   // 发送命令，举例：地址0x00，命令0x10，Data=[0x01, 0x02]
   async sendCommand(adr, cmd, data = [], process, error, options) {
     try {
-      if (!this.writer)
+      if (!this.wsServer)
         return error && error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
         const cmdByte = this.buildCommand(adr, cmd, data);
-        await this.writer.write(cmdByte);
+        this.wsServer.send(
+          getParams({ action: "send", data: byteToHex(cmdByte).join(" ") }),
+        );
         log(byteToHex(cmdByte), "发送");
         await this.readResponse(process, error);
         await delayExec(100);
@@ -67,95 +108,64 @@ export class RfidWYuan extends RfidInterface {
   }
 
   // 读取结果
-  async readResponse(process, error) {
+  readResponse(process, error) {
     try {
-      // 等待结果返回
-      const result = [];
-      let fullLen = null;
-      while (this.port?.readable && this.scanning) {
-        const { value, done } = await this.reader.read();
-        if (done || !value) return;
-        if (!result.length) fullLen = Number(value[0]) + 1; // +1取整体长度+Len本身的长度
-        const formatValue = byteToHex(value);
-        result.push(...formatValue);
-        if (result.length === fullLen) {
-          if (
-            result[3] === WY_STATUS_MAP.finish.code ||
-            result[3] === WY_STATUS_MAP.success.code
-          ) {
-            // 完成
-            this.splicing.push({ data: [...result] });
-            result.splice(0);
-            return process({
-              code: "success",
-              data: this.splicing,
-              finish: true,
-            });
-          } else if (result[3] === WY_STATUS_MAP.extend.code) {
-            // 拼接
-            // log(result, "Part" + this.splicing.length);
-            this.splicing.push({
-              data: [...result],
-              label: this.parseResponse(result.slice(6, -2)),
-            });
-            result.splice(0);
-            process({ code: "success", data: this.splicing, finish: false });
-          } else {
-            // 错误码
-            let msg = result[3];
-            if (msg === WY_STATUS_MAP.overTime.code) return; //
-            Object.keys(WY_STATUS_MAP).findIndex((n) => {
-              if (result[3] === WY_STATUS_MAP[n]?.code)
-                msg = WY_STATUS_MAP[n]?.msg;
-            });
-            this.scanStop();
-            return error({ code: result[3], msg }); // 返回错误消息
+      return new Promise((resolve) => {
+        // 等待结果返回
+        const result = [];
+        let fullLen = null;
+        this.wsListener = (value) => {
+          if (!this.scanning) return resolve();
+          if (!result.length) fullLen = Number("0x" + value[0]) + 1; // +1取整体长度+Len本身的长度
+          result.push(...value);
+          if (result.length === fullLen) {
+            if (
+              result[3] === WY_STATUS_MAP.finish.code ||
+              result[3] === WY_STATUS_MAP.success.code
+            ) {
+              // 完成
+              this.splicing.push({ data: [...result] });
+              result.splice(0);
+              return resolve(
+                process({
+                  code: "success",
+                  data: this.splicing,
+                  finish: true,
+                }),
+              );
+            } else if (result[3] === WY_STATUS_MAP.extend.code) {
+              // 拼接
+              // log(result, "Part" + this.splicing.length);
+              this.splicing.push({
+                data: [...result],
+                label: this.parseResponse(result.slice(6, -2)),
+              });
+              result.splice(0);
+              process({ code: "success", data: this.splicing, finish: false });
+            } else {
+              // 错误码
+              let msg = result[3];
+              if (msg === WY_STATUS_MAP.overTime.code) return resolve(); //
+              Object.keys(WY_STATUS_MAP).findIndex((n) => {
+                if (result[3] === WY_STATUS_MAP[n]?.code)
+                  msg = WY_STATUS_MAP[n]?.msg;
+              });
+              this.scanStop();
+              return resolve(error({ code: result[3], msg })); // 返回错误消息
+            }
           }
-        }
-      }
+        };
+      });
     } catch (e) {
       this.scanStop();
-      return error({ code: "JS", msg: String(e) });
+      return Promise.resolve(error({ code: "JS", msg: String(e) }));
     }
   }
 
   // 串口关闭连接
   async disconnect() {
     try {
-      if (!this.port) return;
-      console.log("正在关闭串口...");
-
-      // 1️⃣ 停止读取
-      if (this.reader) {
-        console.log("取消读取...");
-        await this.reader.cancel().catch(() => {});
-        this.reader.releaseLock();
-        this.reader = null;
-      }
-
-      // 2️⃣ 停止写入
-      if (this.writer) {
-        console.log("关闭写入...");
-        await this.writer.close().catch(() => {});
-        this.writer.releaseLock();
-        this.writer = null;
-      }
-
-      // 3️⃣ 确保流已释放
-      if (this.port?.readable) {
-        await this.port.readable.cancel();
-      }
-
-      if (this.port?.writable) {
-        await this.port.writable.abort();
-      }
-
-      // 4️⃣ 最后关闭串口
-      if (this.port) {
-        await this.port.close();
-        this.port = null;
-        console.log("✅ 串口已成功关闭");
-      }
+      this.wsServer.send(getParams({ action: "close" }));
     } catch (err) {
       console.error("关闭串口时出错：", err);
     }
@@ -206,6 +216,7 @@ export class RfidWYuan extends RfidInterface {
   // 结束扫描
   scanStop() {
     this.scanning = false;
+    this.wsListener = null;
     this.splicing.splice(0);
     // console.log(this.splicing, "-------------------------stop");
   }
