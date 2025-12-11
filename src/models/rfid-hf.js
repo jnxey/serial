@@ -8,8 +8,8 @@ import {
   log,
 } from "../tools";
 
+const HF_SUPPORT_PORTS = 8899;
 const READ_LABEL_LENGTH = 19;
-const READ_FINISH_LENGTH = 12;
 
 export class RfidHf extends RfidInterface {
   scanning = false;
@@ -29,50 +29,46 @@ export class RfidHf extends RfidInterface {
         } else if (info.type === "ports") {
           // 拿到已连接的设备，并连接
           const ports = info.data?.map((val) => ({
-            value: val.ip + "_" + val.ports[0],
+            value: val.ip + "_" + val.port,
             name: val.mac,
           }));
-          if (!ports.length)
-            return error && error({ msg: "Not Found Devices" });
+          if (!ports.length) return error({ msg: "Not Found Devices" });
           let cKey = ports.findIndex(
             (val) => val.value === options.cache_device,
           );
           if (!!ports[cKey]) {
             // 连接设备
             this.wsServer.send(
-              getParams({
-                action: "open",
-                rIP: ports[cKey].value,
-              }),
+              getParams({ action: "open", rIP: ports[cKey].value }),
             );
           } else if (!!options.select_port) {
             const rIP = await options.select_port(ports);
-            this.wsServer.send(
-              getParams({
-                action: "open",
-                rIP: rIP,
-              }),
-            );
+            this.wsServer.send(getParams({ action: "open", rIP: rIP }));
           }
         } else if (info.type === "open-success") {
           // 已打开串口
-          if (success) success();
+          success();
+        } else if (info.type === "error") {
+          // 已打开串口
+          error(info.msg);
         }
       };
 
       // 先获取设备
       this.wsServer.onopen = () => {
-        this.wsServer.send(getParams({ action: "ports" }));
+        this.wsServer.send(
+          getParams({ action: "ports", port: HF_SUPPORT_PORTS }),
+        );
       };
     } catch (e) {
-      if (error) error(e);
+      error(e);
     }
   }
 
   async sendCommand(cmd, process, error, options) {
     try {
       if (!this.wsServer)
-        return error && error({ msg: "Please connect the device first." });
+        return error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
         this.wsServer.send(getParams({ action: "send", data: cmd }));
@@ -82,7 +78,7 @@ export class RfidHf extends RfidInterface {
       }
     } catch (e) {
       log(e);
-      if (error) error({ code: "JS", msg: String(e) });
+      error({ code: "JS", msg: String(e) });
       this.scanStop();
     }
   }
@@ -121,8 +117,7 @@ export class RfidHf extends RfidInterface {
 
   async disconnect() {
     console.log("❌ 串口连接关闭");
-    if (!this.wsServer)
-      return error && error({ msg: "Please connect the device first." });
+    if (!this.wsServer) return;
     this.wsServer.close();
   }
 

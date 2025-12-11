@@ -46,8 +46,7 @@ export class RfidWYuan extends RfidInterface {
             value: val.path,
             name: val.path,
           }));
-          if (!ports.length)
-            return error && error({ msg: "Not Found Devices" });
+          if (!ports.length) return error({ msg: "Not Found Devices" });
           let cKey = ports.findIndex(
             (val) => val.value === options.cache_device,
           );
@@ -72,7 +71,10 @@ export class RfidWYuan extends RfidInterface {
           }
         } else if (info.type === "open-success") {
           // 已打开串口
-          if (success) success();
+          success();
+        } else if (info.type === "error") {
+          // 已打开串口
+          error(info.msg);
         }
       };
 
@@ -81,7 +83,7 @@ export class RfidWYuan extends RfidInterface {
         this.wsServer.send(getParams({ action: "ports" }));
       };
     } catch (e) {
-      if (error) error(e);
+      error(e);
     }
   }
 
@@ -89,7 +91,7 @@ export class RfidWYuan extends RfidInterface {
   async sendCommand(adr, cmd, data = [], process, error, options) {
     try {
       if (!this.wsServer)
-        return error && error({ msg: "Please connect the device first." });
+        return error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
         const cmdByte = this.buildCommand(adr, cmd, data);
@@ -102,7 +104,7 @@ export class RfidWYuan extends RfidInterface {
       }
     } catch (e) {
       log(e);
-      if (error) error({ code: "JS", msg: String(e) });
+      error({ code: "JS", msg: String(e) });
       this.scanStop();
     }
   }
