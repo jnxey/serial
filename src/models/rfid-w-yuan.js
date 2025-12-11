@@ -100,7 +100,7 @@ export class RfidWYuan extends RfidInterface {
         );
         log(byteToHex(cmdByte), "发送");
         await this.readResponse(process, error);
-        await delayExec(100);
+        await delayExec(300);
       }
     } catch (e) {
       log(e);

@@ -74,7 +74,7 @@ export class RfidHf extends RfidInterface {
         this.wsServer.send(getParams({ action: "send", data: cmd }));
         log(byteToHex(cmd), "发送");
         await this.readResponse(process, error);
-        await delayExec(100);
+        await delayExec(300);
       }
     } catch (e) {
       log(e);
