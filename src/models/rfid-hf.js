@@ -16,6 +16,7 @@ export class RfidHf extends RfidInterface {
   splicing = []; // 行进中的
   wsServer = null;
   wsListener = null;
+  overTimer = null;
 
   async connect(success, error, options = {}) {
     try {
@@ -91,9 +92,14 @@ export class RfidHf extends RfidInterface {
   readResponse(process, error) {
     try {
       return new Promise((resolve) => {
+        this.overTimer = setTimeout(() => {
+          // 超时处理
+          clearTimeout(this.overTimer);
+          resolve();
+        }, 5000);
         // 等待结果返回
         this.wsListener = (buffer) => {
-          if (!this.scanning) return resolve();
+          if (!this.scanning) return (clearTimeout(this.overTimer), resolve());
           const result = buffer?.data ?? [];
           const format = byteToHex(result);
           if (result.length === READ_LABEL_LENGTH) {
@@ -106,6 +112,7 @@ export class RfidHf extends RfidInterface {
             });
             process({ code: "success", data: this.splicing, finish: false });
           } else {
+            clearTimeout(this.overTimer);
             // 完成此次操作
             return resolve(
               process({ code: "success", data: this.splicing, finish: true }),
@@ -142,6 +149,7 @@ export class RfidHf extends RfidInterface {
     this.scanning = false;
     this.wsListener = null;
     this.splicing.splice(0);
+    clearTimeout(this.overTimer);
   }
 
   // 格式化数据，去重
