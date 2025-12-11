@@ -29,7 +29,6 @@ export class RfidWYuan extends RfidInterface {
   splicing = []; // 行进中的
   wsServer = null;
   wsListener = null;
-  overTimer = null;
 
   // 连接设备
   async connect(success, error, options = {}) {
@@ -112,16 +111,11 @@ export class RfidWYuan extends RfidInterface {
   readResponse(process, error) {
     try {
       return new Promise((resolve) => {
-        this.overTimer = setTimeout(() => {
-          // 超时处理
-          clearTimeout(this.overTimer);
-          resolve();
-        }, 5000);
         // 等待结果返回
         const result = [];
         let fullLen = null;
         this.wsListener = (value) => {
-          if (!this.scanning) return (clearTimeout(this.overTimer), resolve());
+          if (!this.scanning) return resolve();
           if (!result.length) fullLen = Number("0x" + value[0]) + 1; // +1取整体长度+Len本身的长度
           result.push(...value);
           if (result.length === fullLen) {
@@ -132,7 +126,6 @@ export class RfidWYuan extends RfidInterface {
               // 完成
               this.splicing.push({ data: [...result] });
               result.splice(0);
-              clearTimeout(this.overTimer);
               return resolve(
                 process({ code: "success", data: this.splicing, finish: true }),
               );
@@ -148,8 +141,7 @@ export class RfidWYuan extends RfidInterface {
             } else {
               // 错误码
               let msg = result[3];
-              if (msg === WY_STATUS_MAP.overTime.code)
-                return (clearTimeout(this.overTimer), resolve()); //
+              if (msg === WY_STATUS_MAP.overTime.code) return resolve(); //
               Object.keys(WY_STATUS_MAP).findIndex((n) => {
                 if (result[3] === WY_STATUS_MAP[n]?.code)
                   msg = WY_STATUS_MAP[n]?.msg;
@@ -222,7 +214,6 @@ export class RfidWYuan extends RfidInterface {
     this.scanning = false;
     this.wsListener = null;
     this.splicing.splice(0);
-    clearTimeout(this.overTimer);
     // console.log(this.splicing, "-------------------------stop");
   }
 
