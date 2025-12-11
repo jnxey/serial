@@ -127,11 +127,7 @@ export class RfidWYuan extends RfidInterface {
               this.splicing.push({ data: [...result] });
               result.splice(0);
               return resolve(
-                process({
-                  code: "success",
-                  data: this.splicing,
-                  finish: true,
-                }),
+                process({ code: "success", data: this.splicing, finish: true }),
               );
             } else if (result[3] === WY_STATUS_MAP.extend.code) {
               // 拼接
@@ -254,22 +250,6 @@ export class RfidWYuan extends RfidInterface {
     const next = data.slice(2 + header.N);
     if (next.length > 0) this.parseResponse(next, result);
     return result;
-  }
-
-  // 获取port
-  async getPort() {
-    const ports = await navigator.serial.getPorts(); // 获取已授权的设备
-    if (ports.length > 0) {
-      // 若之前授权过
-      const port = ports[0];
-      console.log("✅ 自动连接成功");
-      return port;
-    } else {
-      // 否则首次请求授权
-      const port = await navigator.serial.requestPort();
-      console.log("✅ 首次授权并连接成功");
-      return port;
-    }
   }
 
   // 构造命令帧

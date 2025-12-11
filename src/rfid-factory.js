@@ -1,18 +1,18 @@
 import { RfidWYuan } from "./models/rfid-w-yuan";
-import { RfidImpinj } from "./models/rfid-impinj";
+import { RfidHf } from "./models/rfid-hf";
 
 export class RfidFactory {
   static MODE = {
     w_yuan: "w-yuan",
-    impinj: "impinj",
+    hf: "hf",
   };
 
   static createInterface(type) {
     switch (type.toLowerCase()) {
       case RfidFactory.MODE.w_yuan:
         return new RfidWYuan();
-      case RfidFactory.MODE.impinj:
-        return new RfidImpinj();
+      case RfidFactory.MODE.hf:
+        return new RfidHf();
       default:
         throw new Error(`未知的RFID接口类型: ${type}`);
     }
