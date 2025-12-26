@@ -93,16 +93,12 @@ export class RfidHf extends RfidInterface {
           const result = buffer?.data ?? [];
           const format = byteToHex(result);
           if (result.length === READ_LABEL_LENGTH) {
+            const tidArr = format.slice(-5, -2);
             // 读取到标签操作
-            // const start = 10
-            const start = -8;
             this.splicing.push({
               data: [...format],
               label: [
-                {
-                  tid: format.slice(start, -2).join(""),
-                  rssi: Number(result[6]),
-                },
+                { tid: tidArr.join("").toUpperCase(), rssi: Number(result[6]) },
               ],
             });
             process({ code: "success", data: this.splicing, finish: false });
