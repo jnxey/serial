@@ -13,6 +13,7 @@ const READ_LABEL_LENGTH = 19;
 
 export class RfidHf extends RfidInterface {
   static scanning = false;
+  deviceIP = null;
   splicing = []; // 行进中的
   wsServer = null;
   wsListener = null;
@@ -54,10 +55,8 @@ export class RfidHf extends RfidInterface {
         }
       };
       this.wsServer.onopen = () => {
-        if (!!options.deviceIP) {
-          this.wsServer.send(
-            getParams({ action: "open", rIP: options.deviceIP }),
-          );
+        if (!!this.deviceIP) {
+          this.wsServer.send(getParams({ action: "open", rIP: this.deviceIP }));
         } else {
           // 先获取设备
           this.wsServer.send(
@@ -98,7 +97,7 @@ export class RfidHf extends RfidInterface {
           const result = buffer?.data ?? [];
           const format = byteToHex(result);
           if (result.length === READ_LABEL_LENGTH) {
-            const tidArr = format.slice(-5, -2);
+            const tidArr = format.slice(10, -2);
             // 读取到标签操作
             this.splicing.push({
               data: [...format],
@@ -106,6 +105,7 @@ export class RfidHf extends RfidInterface {
                 {
                   tid: tidArr.join("").toUpperCase(),
                   rssi: Number(result[6]),
+                  ant: Number(result[5]),
                 },
               ],
             });
@@ -132,7 +132,7 @@ export class RfidHf extends RfidInterface {
 
   // 扫描标签
   scanLabel(process, error, options = {}) {
-    const opts = { ant: 0x01, scanTime: 50, ...options };
+    const opts = { ant: 0xff, scanTime: 50, ...options };
     const cmd = [0xdd, 0x11, 0xef, "len", opts.ant, 0x01, 0x01];
     cmd[3] = cmd.length + 2;
     const crc = CRC16Modbus(Uint8Array.from(cmd));
