@@ -12,7 +12,7 @@ const HF_SUPPORT_PORTS = 8899;
 const READ_LABEL_LENGTH = 19;
 
 export class RfidHf extends RfidInterface {
-  scanning = false;
+  static scanning = false;
   splicing = []; // 行进中的
   wsServer = null;
   wsListener = null;
@@ -53,12 +53,17 @@ export class RfidHf extends RfidInterface {
           error(info.msg);
         }
       };
-
-      // 先获取设备
       this.wsServer.onopen = () => {
-        this.wsServer.send(
-          getParams({ action: "ports", port: HF_SUPPORT_PORTS }),
-        );
+        if (!!options.deviceIP) {
+          this.wsServer.send(
+            getParams({ action: "open", rIP: options.deviceIP }),
+          );
+        } else {
+          // 先获取设备
+          this.wsServer.send(
+            getParams({ action: "ports", port: HF_SUPPORT_PORTS }),
+          );
+        }
       };
     } catch (e) {
       error(e);
@@ -98,7 +103,10 @@ export class RfidHf extends RfidInterface {
             this.splicing.push({
               data: [...format],
               label: [
-                { tid: tidArr.join("").toUpperCase(), rssi: Number(result[6]) },
+                {
+                  tid: tidArr.join("").toUpperCase(),
+                  rssi: Number(result[6]),
+                },
               ],
             });
             process({ code: "success", data: this.splicing, finish: false });

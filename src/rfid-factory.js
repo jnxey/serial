@@ -2,6 +2,7 @@ import { RfidWYuan } from "./models/rfid-w-yuan";
 import { RfidHf } from "./models/rfid-hf";
 
 export class RfidFactory {
+  static HF_SUPPORT_PORTS = 8899;
   static MODE = {
     w_yuan: "w-yuan",
     hf: "hf",
