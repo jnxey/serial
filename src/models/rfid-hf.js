@@ -105,7 +105,7 @@ export class RfidHf extends RfidInterface {
                 {
                   tid: tidArr.join("").toUpperCase(),
                   rssi: Number(result[6]),
-                  ant: Number(result[5]),
+                  antenna: Number(result[5]),
                 },
               ],
             });
