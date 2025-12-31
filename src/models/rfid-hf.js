@@ -31,7 +31,7 @@ export class RfidHf extends RfidInterface {
           // 拿到已连接的设备，并连接
           const ports = info.data?.map((val) => ({
             value: val.ip + "_" + val.port,
-            name: val.mac,
+            name: val.ip + "_" + val.port,
           }));
           if (!ports.length) return error({ msg: "Not Found Devices" });
           let cKey = ports.findIndex(
@@ -98,6 +98,7 @@ export class RfidHf extends RfidInterface {
           const format = byteToHex(result);
           if (result.length === READ_LABEL_LENGTH) {
             const tidArr = format.slice(10, -2);
+            console.log(tidArr.join("").toUpperCase(), "-----------tid");
             // 读取到标签操作
             this.splicing.push({
               data: [...format],
@@ -105,7 +106,7 @@ export class RfidHf extends RfidInterface {
                 {
                   tid: tidArr.join("").toUpperCase(),
                   rssi: Number(result[6]),
-                  antenna: Number(result[5]),
+                  antenna: Number(result[4]),
                 },
               ],
             });
