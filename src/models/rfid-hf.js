@@ -75,6 +75,7 @@ export class RfidHf extends RfidInterface {
         return error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
+        this.clearSplicing();
         this.wsServer.send(getParams({ action: "send", data: cmd }));
         log(byteToHex(cmd), "发送");
         await this.readResponse(process, error);
@@ -146,6 +147,11 @@ export class RfidHf extends RfidInterface {
   scanStop() {
     this.scanning = false;
     this.wsListener = null;
+    this.clearSplicing();
+  }
+
+  // 清空卡片列表
+  clearSplicing() {
     this.splicing.splice(0);
   }
 

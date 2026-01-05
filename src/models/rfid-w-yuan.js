@@ -94,6 +94,7 @@ export class RfidWYuan extends RfidInterface {
         return error({ msg: "Please connect the device first." });
       this.scanning = true;
       while (this.scanning) {
+        this.clearSplicing();
         const cmdByte = this.buildCommand(adr, cmd, data);
         this.wsServer.send(
           getParams({ action: "send", data: byteToHex(cmdByte).join(" ") }),
@@ -215,8 +216,13 @@ export class RfidWYuan extends RfidInterface {
   scanStop() {
     this.scanning = false;
     this.wsListener = null;
-    this.splicing.splice(0);
+    this.clearSplicing();
     // console.log(this.splicing, "-------------------------stop");
+  }
+
+  // 清空卡片列表
+  clearSplicing() {
+    this.splicing.splice(0);
   }
 
   // 格式化数据，去重
