@@ -99,7 +99,7 @@ export class RfidHf extends RfidInterface {
           const format = byteToHex(result);
           if (result.length === READ_LABEL_LENGTH) {
             const tidArr = format.slice(10, -2);
-            console.log(tidArr.join("").toUpperCase(), "-----------tid");
+            // console.log(tidArr.join("").toUpperCase(), "-----------tid");
             // 读取到标签操作
             this.splicing.push({
               data: [...format],
