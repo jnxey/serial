@@ -74,18 +74,12 @@ export class RfidHf extends RfidInterface {
       if (!this.wsServer)
         return error({ msg: "Please connect the device first." });
       this.scanning = true;
-      if (!!options.single) {
+      while (this.scanning) {
+        this.clearSplicing();
         this.wsServer.send(getParams({ action: "send", data: cmd }));
         // log(byteToHex(cmd), "发送");
         await this.readResponse(process, error);
-        this.scanning = false;
-      } else {
-        while (this.scanning) {
-          this.wsServer.send(getParams({ action: "send", data: cmd }));
-          // log(byteToHex(cmd), "发送");
-          await this.readResponse(process, error);
-          await delayExec(100);
-        }
+        await delayExec(300);
       }
     } catch (e) {
       log(e);
