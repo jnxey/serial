@@ -89,7 +89,7 @@ export class RfidHf extends RfidInterface {
   }
 
   // 读取结果
-  readResponse(cmd, process, error, isMultiple) {
+  readResponse(process, error, isMultiple) {
     try {
       const startTime = Date.now();
 
