@@ -17,6 +17,7 @@ export class RfidHf extends RfidInterface {
   splicing = []; // 行进中的
   wsServer = null;
   wsListener = null;
+  history = [];
 
   async connect(success, error, options = {}) {
     try {
@@ -145,18 +146,6 @@ export class RfidHf extends RfidInterface {
     this.wsServer.close();
   }
 
-  // 根据信号强度去重
-  dedupeByTid(list) {
-    const map = new Map();
-    for (const item of list) {
-      const old = map.get(item.tid);
-      if (!old || item.rssi > old.rssi) {
-        map.set(item.tid, item);
-      }
-    }
-    return [...map.values()];
-  }
-
   // 扫描标签
   scanLabel(process, error, options = {}) {
     const opts = { ant: 0xff, scanTime: 50, ...options };
@@ -172,6 +161,7 @@ export class RfidHf extends RfidInterface {
   scanStop() {
     this.scanning = false;
     this.wsListener = null;
+    this.history = [];
     this.clearSplicing();
   }
 
@@ -180,22 +170,71 @@ export class RfidHf extends RfidInterface {
     this.splicing.splice(0);
   }
 
+  // 根据信号强度去重
+  dedupeByTid(list) {
+    const map = new Map();
+    for (const item of list) {
+      const old = map.get(item.tid);
+      if (!old || item.rssi > old.rssi) {
+        map.set(item.tid, item);
+      }
+    }
+    return [...map.values()];
+  }
+
+  findMostFrequent(arr) {
+    // 处理空数组情况
+    if (arr.length === 0) return null;
+
+    let frequency = {};
+    let maxCount = 0;
+    let mostFrequentNum = null;
+
+    // 遍历数组，统计每个数字的出现次数
+    for (let num of arr) {
+      // 使用逻辑或运算符简化代码，如果frequency[num]不存在则初始化为0再加1
+      frequency[num] = (frequency[num] || 0) + 1;
+
+      // 动态更新最大值
+      if (frequency[num] > maxCount) {
+        maxCount = frequency[num];
+        mostFrequentNum = num;
+      }
+    }
+
+    return mostFrequentNum;
+  }
+
+  // 根据历史记录，设置天线
+  formatAnt(list) {
+    const count = {};
+    const antMap = {};
+    this.history.forEach((labels) => {
+      labels.forEach((item) => {
+        if (!count[item.tid]) count[item.tid] = [];
+        count[item.tid].push(item.antenna);
+      });
+    });
+    Object.keys(count).forEach((tid) => {
+      antMap[tid] = this.findMostFrequent(count[tid]);
+    });
+    return list.map((item) => {
+      const fValue = antMap[item.tid];
+      return { ...item, antenna: !!fValue ? fValue : item.antenna };
+    });
+  }
+
   // 格式化数据，去重
   formatLabel(labels) {
     if (!labels) return {};
-    const result = {};
-    labels = this.dedupeByTid(labels);
+    const result = [];
     labels.forEach((data) => {
       if (!data.label) return;
-      data.label.forEach((label) => {
-        // if (label.rssi < 50) return;
-        if (!!result[label.tid]) {
-          result[label.tid].count = result[label.tid].count + 1;
-        } else {
-          result[label.tid] = { ...label, count: 1 };
-        }
-      });
+      result.push(...data.label);
     });
-    return Object.keys(result).map((n) => result[n]);
+    const format = this.dedupeByTid(result);
+    this.history.push(format);
+    this.history = this.history.slice(-3);
+    return this.formatAnt(format);
   }
 }
