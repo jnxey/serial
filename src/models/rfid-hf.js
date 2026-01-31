@@ -91,6 +91,7 @@ export class RfidHf extends RfidInterface {
   // 读取结果
   readResponse(process, error) {
     try {
+      const startTime = Date.now();
       return new Promise((resolve) => {
         // 等待结果返回
         this.wsListener = (buffer) => {
@@ -115,7 +116,12 @@ export class RfidHf extends RfidInterface {
           } else {
             // 完成此次操作
             return resolve(
-              process({ code: "success", data: this.splicing, finish: true }),
+              process({
+                code: "success",
+                data: this.splicing,
+                finish: true,
+                time: Date.now() - startTime,
+              }),
             );
           }
         };
