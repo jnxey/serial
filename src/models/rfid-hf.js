@@ -89,9 +89,10 @@ export class RfidHf extends RfidInterface {
   }
 
   // 读取结果
-  readResponse(process, error) {
+  readResponse(cmd, process, error, isMultiple) {
     try {
       const startTime = Date.now();
+
       return new Promise((resolve) => {
         // 等待结果返回
         this.wsListener = (buffer) => {
@@ -144,6 +145,18 @@ export class RfidHf extends RfidInterface {
     this.wsServer.close();
   }
 
+  // 根据信号强度去重
+  dedupeByTid(list) {
+    const map = new Map();
+    for (const item of list) {
+      const old = map.get(item.tid);
+      if (!old || item.rssi > old.rssi) {
+        map.set(item.tid, item);
+      }
+    }
+    return [...map.values()];
+  }
+
   // 扫描标签
   scanLabel(process, error, options = {}) {
     const opts = { ant: 0xff, scanTime: 50, ...options };
@@ -171,6 +184,7 @@ export class RfidHf extends RfidInterface {
   formatLabel(labels) {
     if (!labels) return {};
     const result = {};
+    labels = this.dedupeByTid(labels);
     labels.forEach((data) => {
       if (!data.label) return;
       data.label.forEach((label) => {
