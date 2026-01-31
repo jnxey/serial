@@ -102,6 +102,7 @@ export class RfidHf extends RfidInterface {
             const tidArr = format.slice(10, -2);
             // console.log(tidArr.join("").toUpperCase(), "-----------tid");
             // 读取到标签操作
+            const isInit = !this.splicing.length;
             this.splicing.push({
               data: [...format],
               label: [
@@ -112,7 +113,12 @@ export class RfidHf extends RfidInterface {
                 },
               ],
             });
-            process({ code: "success", data: this.splicing, finish: false });
+            process({
+              code: "success",
+              data: this.splicing,
+              finish: false,
+              init: isInit,
+            });
           } else {
             // 完成此次操作
             return resolve(
